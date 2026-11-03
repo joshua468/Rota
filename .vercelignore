@@ -13,3 +13,6 @@ Inspo
 .env
 .env.*
 !.env.example
+
+# Vercel gets the bundled CommonJS function (tools/build-api.mjs)
+api/index.ts

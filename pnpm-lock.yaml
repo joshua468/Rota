@@ -15,6 +15,9 @@ importers:
 
   .:
     devDependencies:
+      esbuild:
+        specifier: 0.28.2
+        version: 0.28.2
       playwright-core:
         specifier: ^1.64.1
         version: 1.64.1
@@ -7064,9 +7067,7 @@ snapshots:
       metro-runtime: 0.87.1
     transitivePeerDependencies:
       - '@babel/core'
-      - bufferutil
       - supports-color
-      - utf-8-validate
 
   '@react-native/normalize-colors@0.74.89': {}
 
