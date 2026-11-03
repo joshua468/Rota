@@ -61,6 +61,36 @@ in `docker-compose.yml` or the image.
 6. Point the mobile app at the API URL configured in `frontend/eas.json` for
    that profile.
 
+## Vercel demo deployment
+
+The public demo runs both the Expo web export and the API on Vercel:
+
+- Web app and API: https://rota-mocha.vercel.app (`/healthz`, `/readyz`).
+- Repo: https://github.com/joshua468/Rota (Vercel project builds `frontend`).
+- Postgres: Neon via the Vercel Marketplace (`DATABASE_URL`,
+  `SHARD_DATABASE_URLS`, `DB_DRIVER=pg`, `DB_SSL=true`, `SHARD_COUNT=1`).
+
+Key differences from a production container, chosen to keep the demo free of
+extra services:
+
+- `NODE_ENV=development`: fake payment driver, dev mail, in-memory rate limits,
+  cache and locks. Do not take real money through this deployment.
+- No Redis. Jobs use the in-process queue and are drained per request; recurring
+  renewals are not scheduled (`registerBillingJobs({ scheduleRenewals: false })`).
+- Vercel serves `api/index.js`, a committed esbuild CommonJS bundle of
+  `tools/api-entry.ts`. Rebuild it after changing backend code:
+
+  ```sh
+  pnpm build:api
+  vercel deploy --prod
+  ```
+
+  Everything except the native `@node-rs/argon2`, `bullmq` and `ioredis` is
+  bundled. `bullmq`/`ioredis` are only loaded when `REDIS_URL` is set.
+
+Before a real launch, move the API to the container topology above with Redis,
+Flutterwave and Resend configured, and set `NODE_ENV=production`.
+
 ## Local production-like stack
 
 Create a `.env` for compose (or export the variables) with `POSTGRES_PASSWORD`,

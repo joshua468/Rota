@@ -11,9 +11,9 @@ Fill each `TODO` with a working link. A missing or broken link means the item is
 
 | Evidence | Link |
 |---|---|
-| Public repo(s) | TODO |
+| Public repo(s) | https://github.com/joshua468/Rota |
 | Android development build | TODO |
-| Deployed backend (`/healthz`) | TODO |
+| Deployed backend (`/healthz`) | https://rota-mocha.vercel.app/healthz |
 | README (with app-store billing section) | TODO |
 | ARCHITECTURE.md + diagram | TODO |
 | STATE.md | TODO |
