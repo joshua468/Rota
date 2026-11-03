@@ -1,0 +1,15 @@
+node_modules
+**/node_modules
+.git
+.expo
+**/.expo
+frontend/dist
+load-tests/results
+screenshots
+Inspo
+*.log
+*.out
+*.err
+.env
+.env.*
+!.env.example

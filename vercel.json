@@ -1,0 +1,20 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "pnpm install --frozen-lockfile",
+  "buildCommand": "pnpm --filter @rota/frontend exec expo export --platform web",
+  "outputDirectory": "frontend/dist",
+  "functions": {
+    "api/index.ts": {
+      "maxDuration": 60,
+      "memory": 1024
+    }
+  },
+  "rewrites": [
+    { "source": "/v1/(.*)", "destination": "/api" },
+    { "source": "/healthz", "destination": "/api" },
+    { "source": "/readyz", "destination": "/api" },
+    { "source": "/metrics", "destination": "/api" },
+    { "source": "/flutterwave/(.*)", "destination": "/api" },
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
+  ]
+}

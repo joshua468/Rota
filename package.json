@@ -6,7 +6,7 @@
   "license": "MIT",
   "packageManager": "pnpm@9.15.4",
   "engines": {
-    "node": ">=20.11"
+    "node": "24.x"
   },
   "scripts": {
     "preinstall": "node tools/check-package-manager.mjs",

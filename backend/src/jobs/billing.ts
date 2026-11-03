@@ -56,7 +56,16 @@ export interface PaymentIntentRow {
   created_at: Date;
 }
 
-export function registerBillingJobs(queue: Queue, deps: AppDeps): void {
+export interface BillingJobsOptions {
+  /**
+   * Serverless invocations are frozen after the response, so a self-scheduling
+   * renewal sweep would never fire reliably there. The container deployment
+   * keeps the default (true).
+   */
+  scheduleRenewals?: boolean;
+}
+
+export function registerBillingJobs(queue: Queue, deps: AppDeps, options: BillingJobsOptions = {}): void {
   queue.register(WEBHOOK_QUEUE, async (payload, ctx) => {
     const eventId = isRecord(payload) && typeof payload.eventId === 'string' ? payload.eventId : null;
     if (!eventId) throw new Error('webhooks job requires an eventId');
@@ -76,7 +85,9 @@ export function registerBillingJobs(queue: Queue, deps: AppDeps): void {
   });
 
   // first sweep shortly after boot, then the handler reschedules itself
-  void queue.add(RENEWALS_QUEUE, {}, { delayMs: RENEWAL_START_DELAY_MS, attempts: 5 });
+  if (options.scheduleRenewals !== false) {
+    void queue.add(RENEWALS_QUEUE, {}, { delayMs: RENEWAL_START_DELAY_MS, attempts: 5 });
+  }
 }
 
 /* ------------------------------------------------------------------ */
