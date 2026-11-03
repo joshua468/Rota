@@ -1,0 +1,66 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: rota
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: rota
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/10-shards.sql:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U rota -d rota']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: ['redis-server', '--appendonly', 'yes']
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      NODE_ENV: production
+      PORT: '4000'
+      DATABASE_URL: postgres://rota:${POSTGRES_PASSWORD}@db:5432/rota
+      SHARD_DATABASE_URLS: postgres://rota:${POSTGRES_PASSWORD}@db:5432/rota_shard0
+      SHARD_COUNT: '1'
+      DB_DRIVER: pg
+      DB_SSL: ${DB_SSL:-false}
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET (32+ random characters)}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:4000}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8081}
+      TRUST_PROXY: ${TRUST_PROXY:-true}
+      FLUTTERWAVE_SECRET_KEY: ${FLUTTERWAVE_SECRET_KEY:?set FLUTTERWAVE_SECRET_KEY}
+      FLUTTERWAVE_SECRET_HASH: ${FLUTTERWAVE_SECRET_HASH:?set FLUTTERWAVE_SECRET_HASH}
+      MAIL_DRIVER: resend
+      MAIL_FROM: ${MAIL_FROM:?set MAIL_FROM}
+      RESEND_API_KEY: ${RESEND_API_KEY:?set RESEND_API_KEY}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      EXPO_ACCESS_TOKEN: ${EXPO_ACCESS_TOKEN:-}
+    command: sh -c "pnpm --filter @rota/backend migrate && pnpm --filter @rota/backend start"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - '4000:4000'
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  redisdata:

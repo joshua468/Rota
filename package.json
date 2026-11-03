@@ -1,0 +1,37 @@
+{
+  "name": "rota",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Rota — shift scheduling, swaps and billing for small teams",
+  "license": "MIT",
+  "packageManager": "pnpm@9.15.4",
+  "engines": {
+    "node": ">=20.11"
+  },
+  "scripts": {
+    "preinstall": "node tools/check-package-manager.mjs",
+    "tokens:build": "node tools/build-tokens.mjs",
+    "tokens:check": "node tools/build-tokens.mjs --check",
+    "check:styles": "node tools/check-no-hardcoded-styles.mjs",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "migrate": "pnpm --filter @rota/backend migrate",
+    "seed": "pnpm --filter @rota/backend seed",
+    "verify": "pnpm tokens:check && pnpm check:styles && pnpm typecheck && pnpm test",
+    "dev:server": "pnpm --filter @rota/backend dev",
+    "dev:app": "pnpm --filter @rota/frontend start"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.64.1",
+    "typescript": "5.6.3"
+  },
+  "pnpm": {
+    "overrides": {
+      "node-forge": "1.4.1",
+      "fast-uri@>=3.0.0 <4": "3.1.9",
+      "fast-uri@>=4.0.0 <4.2.3": "4.2.3",
+      "glob@>=9.0.0 <=14.0.1": "14.0.2",
+      "minimatch@<11.0.1": "11.0.1"
+    }
+  }
+}
