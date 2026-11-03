@@ -29,3 +29,6 @@ screen*.jpg
 *.out
 *.err
 .vercel/
+
+.vercel
+.env*

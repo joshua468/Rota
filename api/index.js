@@ -6040,13 +6040,13 @@ ${n3}`), 0;
   }
 });
 
-// api/index.ts
-var index_exports = {};
-__export(index_exports, {
+// tools/api-entry.ts
+var api_entry_exports = {};
+__export(api_entry_exports, {
   config: () => config,
   default: () => handler
 });
-module.exports = __toCommonJS(index_exports);
+module.exports = __toCommonJS(api_entry_exports);
 
 // backend/src/app.ts
 var import_cors = __toESM(require("@fastify/cors"), 1);
@@ -10793,7 +10793,7 @@ function createLogger(level = "info") {
 }
 var logger = createLogger(process.env.LOG_LEVEL ?? "info");
 
-// api/index.ts
+// tools/api-entry.ts
 var config = { maxDuration: 60 };
 var runtime = null;
 function boot() {

@@ -17,7 +17,7 @@ const external = [
 ];
 
 await build({
-  entryPoints: ['api/index.ts'],
+  entryPoints: ['tools/api-entry.ts'],
   outfile: 'api/index.js',
   bundle: true,
   platform: 'node',
