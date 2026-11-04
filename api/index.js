@@ -76610,114 +76610,6 @@ var MemoryQueue = class {
     for (const wake of waiters) wake();
   }
 };
-var BullMqQueue = class {
-  constructor(redisUrl, log) {
-    this.log = log;
-    this.connection = { url: redisUrl };
-  }
-  log;
-  queues = /* @__PURE__ */ new Map();
-  workers = [];
-  handlers = /* @__PURE__ */ new Map();
-  connection;
-  register(queue, handler2) {
-    this.handlers.set(queue, handler2);
-    void this.ensureWorker(queue);
-  }
-  async add(queue, payload, options = {}) {
-    const { Queue: BullQueue } = await import("bullmq");
-    let q2 = this.queues.get(queue);
-    if (!q2) {
-      q2 = new BullQueue(queue, { connection: { url: this.connection.url } });
-      this.queues.set(queue, q2);
-    }
-    const job = await q2.add(queue, payload, {
-      delay: options.delayMs,
-      attempts: options.attempts ?? DEFAULT_ATTEMPTS,
-      backoff: { type: "exponential", delay: BASE_BACKOFF_MS },
-      removeOnComplete: 1e3,
-      removeOnFail: 5e3
-    });
-    return String(job.id);
-  }
-  inFlight() {
-    return 0;
-  }
-  async drain() {
-  }
-  async healthy() {
-    try {
-      const { default: Redis } = await import("ioredis");
-      const client = new Redis(this.connection.url, {
-        maxRetriesPerRequest: 1,
-        lazyConnect: true,
-        connectTimeout: 3e3
-      });
-      try {
-        await client.connect();
-        await client.ping();
-        return true;
-      } finally {
-        await client.quit().catch(() => void 0);
-      }
-    } catch {
-      return false;
-    }
-  }
-  async close() {
-    await Promise.all([...this.workers.map((w4) => w4.close()), ...[...this.queues.values()].map((q2) => q2.close())]);
-  }
-  async ensureWorker(queue) {
-    if (this.workers.some((w4) => w4.name === queue)) return;
-    const { Worker } = await import("bullmq");
-    const handler2 = this.handlers.get(queue);
-    if (!handler2) return;
-    const worker = new Worker(
-      queue,
-      async (job) => {
-        const started = Date.now();
-        try {
-          await handler2(job.data, { queue, jobId: String(job.id), attempt: job.attemptsMade + 1, log: this.log });
-          this.log.info(
-            { queue, jobId: job.id, attempt: job.attemptsMade + 1, result: "ok", ms: Date.now() - started },
-            "job finished"
-          );
-        } catch (error62) {
-          this.log.warn(
-            { queue, jobId: job.id, attempt: job.attemptsMade + 1, result: "retry", ms: Date.now() - started, err: error62 },
-            "job failed"
-          );
-          throw error62;
-        }
-      },
-      { connection: { url: this.connection.url } }
-    );
-    this.workers.push(worker);
-  }
-};
-async function createQueue(redisUrl, log, required2 = false) {
-  if (redisUrl) {
-    try {
-      await import("bullmq");
-      const { default: Redis } = await import("ioredis");
-      const probe = new Redis(redisUrl, { maxRetriesPerRequest: 1, lazyConnect: true, connectTimeout: 5e3 });
-      try {
-        await probe.connect();
-        await probe.ping();
-      } finally {
-        await probe.quit().catch(() => void 0);
-      }
-      return new BullMqQueue(redisUrl, log);
-    } catch (error62) {
-      if (required2) {
-        throw new Error(`Refusing to start: Redis queue is unavailable (${error62.message})`);
-      }
-      log.error({ err: error62 }, 'bullmq unavailable \uFFFD?" falling back to in-process queue');
-    }
-  }
-  if (required2) throw new Error("Refusing to start: REDIS_URL is required in production");
-  return new MemoryQueue(log);
-}
 
 // backend/src/jobs/push.ts
 var PUSH_QUEUE = "push";
@@ -78793,6 +78685,23 @@ function authorizePage(txRef, amount, callback) {
 </html>`;
 }
 
+// backend/src/routes/internal.ts
+function registerInternalRoutes(app, deps) {
+  const run2 = async (authorization) => {
+    if (!deps.env.CRON_SECRET) throw notFound();
+    const expected = `Bearer ${deps.env.CRON_SECRET}`;
+    if (!authorization || !safeEqual(expected, authorization)) throw unauthorized("Invalid cron secret");
+    const log = app.log;
+    await runRenewals(deps, log);
+    const reconciled = await reconcileWebhookEvents(deps, log);
+    const cleaned = await cleanupExpiredIdempotency(deps.topology.global);
+    await deps.queue.drain(25e3);
+    return { ok: true, reconciled, cleaned };
+  };
+  app.get("/v1/internal/cron", async (req) => run2(req.headers.authorization));
+  app.post("/v1/internal/cron", async (req) => run2(req.headers.authorization));
+}
+
 // backend/src/app.ts
 function createMetrics() {
   return { startedAt: Date.now(), requests: 0, errors: 0, byStatus: {} };
@@ -78898,6 +78807,7 @@ async function buildApp(options) {
   registerBillingRoutes(app, deps);
   registerWebhookRoutes(app, deps);
   registerDevCheckoutRoutes(app, deps);
+  registerInternalRoutes(app, deps);
   return app;
 }
 
@@ -79155,6 +79065,8 @@ var EnvObject = external_exports.object({
   CORS_ORIGINS: originList,
   /** Only enable behind a trusted proxy/load balancer; otherwise X-Forwarded-For is spoofable. */
   TRUST_PROXY: boolish.default(false),
+  /** Bearer secret Vercel Cron sends to `/v1/internal/cron`; empty disables the route. */
+  CRON_SECRET: external_exports.string().default(""),
   /** Flutterwave secret key (test or live). Empty selects the deterministic fake driver outside production. */
   FLUTTERWAVE_SECRET_KEY: external_exports.string().default(""),
   FLUTTERWAVE_PUBLIC_KEY: external_exports.string().default(""),
@@ -79175,6 +79087,7 @@ var EnvSchema = EnvObject.superRefine((env, ctx) => {
     if (!value) ctx.addIssue({ code: external_exports.ZodIssueCode.custom, path: [path2], message: message2 });
   };
   require2(env.REDIS_URL, "REDIS_URL", "REDIS_URL is required in production");
+  require2(env.CRON_SECRET, "CRON_SECRET", "CRON_SECRET is required in production");
   require2(env.FLUTTERWAVE_SECRET_KEY, "FLUTTERWAVE_SECRET_KEY", "a real payment key is required in production");
   require2(env.FLUTTERWAVE_SECRET_HASH, "FLUTTERWAVE_SECRET_HASH", "webhook verification hash is required in production");
   require2(env.MAIL_FROM, "MAIL_FROM", "MAIL_FROM is required in production");
@@ -79317,7 +79230,7 @@ function boot() {
     const env = loadEnv();
     const log = createLogger(env.NODE_ENV === "test" ? "silent" : "info");
     const topology = await createTopology(env);
-    const queue = await createQueue(env.REDIS_URL, log, false);
+    const queue = new MemoryQueue(log);
     registerMailJobs(queue, env, log);
     const cache = await createCache(env.REDIS_URL, log);
     const rateLimiter = await createRateLimiter(env, log);

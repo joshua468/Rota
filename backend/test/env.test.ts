@@ -54,6 +54,7 @@ describe('loadEnv', () => {
       DATABASE_URL: 'postgres://user:pass@db:5432/rota',
       SHARD_DATABASE_URLS: 'postgres://user:pass@db:5432/rota_shard0',
       REDIS_URL: 'redis://redis:6379',
+      CRON_SECRET: 'cron-secret',
       FLUTTERWAVE_SECRET_KEY: 'flw_live_key',
       FLUTTERWAVE_SECRET_HASH: 'webhook-hash',
       MAIL_DRIVER: 'resend',
@@ -68,6 +69,10 @@ describe('loadEnv', () => {
 
     it('refuses to start without REDIS_URL', () => {
       expect(() => loadEnv({ ...production, REDIS_URL: '' })).toThrow(/REDIS_URL/);
+    });
+
+    it('refuses to start without CRON_SECRET', () => {
+      expect(() => loadEnv({ ...production, CRON_SECRET: '' })).toThrow(/CRON_SECRET/);
     });
 
     it('refuses to start without a real payment key', () => {

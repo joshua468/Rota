@@ -9,6 +9,12 @@
       "memory": 1024
     }
   },
+  "crons": [
+    {
+      "path": "/v1/internal/cron",
+      "schedule": "0 0 * * *"
+    }
+  ],
   "rewrites": [
     { "source": "/v1/(.*)", "destination": "/api" },
     { "source": "/healthz", "destination": "/api" },

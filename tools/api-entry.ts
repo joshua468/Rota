@@ -6,7 +6,7 @@ import { loadEnv } from '../backend/src/env';
 import { createRateLimiter } from '../backend/src/http/rate-limit';
 import { registerBillingJobs } from '../backend/src/jobs/billing';
 import { registerMailJobs } from '../backend/src/jobs/mail';
-import { createQueue } from '../backend/src/jobs/queue';
+import { MemoryQueue, type Queue } from '../backend/src/jobs/queue';
 import { createLock } from '../backend/src/locks/locks';
 import { createLogger } from '../backend/src/lib/logger';
 
@@ -15,17 +15,18 @@ import { createLogger } from '../backend/src/lib/logger';
  * without `listen()`: Fastify's documented `routing(req, res)` seam lets the
  * platform hand a Node request straight to the router.
  *
- * Serverless caveat: the in-process queue driver is used and the renewal
- * schedule is disabled, because a function instance is frozen after the
- * response. Webhook and mail jobs accepted during a request are drained before
- * the invocation returns; recurring renewals need the container deployment in
- * docs/DEPLOYMENT.md.
+ * Jobs run on the in-process queue even when Redis is configured: a function
+ * instance is frozen after the response, so a BullMQ worker could be killed
+ * mid-job. Webhook and mail jobs accepted during a request are drained before
+ * the invocation returns; Redis still provides durable rate limits, cache and
+ * the renewal lock, and Vercel Cron drives `runRenewals` through
+ * `/v1/internal/cron`.
  */
 export const config = { maxDuration: 60 };
 
 interface Runtime {
   app: Awaited<ReturnType<typeof buildApp>>;
-  queue: Awaited<ReturnType<typeof createQueue>>;
+  queue: Queue;
 }
 
 let runtime: Promise<Runtime> | null = null;
@@ -36,7 +37,7 @@ function boot(): Promise<Runtime> {
     const env = loadEnv();
     const log = createLogger(env.NODE_ENV === 'test' ? 'silent' : 'info');
     const topology = await createTopology(env);
-    const queue = await createQueue(env.REDIS_URL, log, false);
+    const queue: Queue = new MemoryQueue(log);
     registerMailJobs(queue, env, log);
     const cache = await createCache(env.REDIS_URL, log);
     const rateLimiter = await createRateLimiter(env, log);

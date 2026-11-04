@@ -55,6 +55,8 @@ const EnvObject = z
     CORS_ORIGINS: originList,
     /** Only enable behind a trusted proxy/load balancer; otherwise X-Forwarded-For is spoofable. */
     TRUST_PROXY: boolish.default(false),
+    /** Bearer secret Vercel Cron sends to `/v1/internal/cron`; empty disables the route. */
+    CRON_SECRET: z.string().default(''),
     /** Flutterwave secret key (test or live). Empty selects the deterministic fake driver outside production. */
     FLUTTERWAVE_SECRET_KEY: z.string().default(''),
     FLUTTERWAVE_PUBLIC_KEY: z.string().default(''),
@@ -77,6 +79,7 @@ const EnvSchema = EnvObject.superRefine((env, ctx) => {
       if (!value) ctx.addIssue({ code: z.ZodIssueCode.custom, path: [path], message });
     };
     require(env.REDIS_URL, 'REDIS_URL', 'REDIS_URL is required in production');
+    require(env.CRON_SECRET, 'CRON_SECRET', 'CRON_SECRET is required in production');
     require(env.FLUTTERWAVE_SECRET_KEY, 'FLUTTERWAVE_SECRET_KEY', 'a real payment key is required in production');
     require(env.FLUTTERWAVE_SECRET_HASH, 'FLUTTERWAVE_SECRET_HASH', 'webhook verification hash is required in production');
     require(env.MAIL_FROM, 'MAIL_FROM', 'MAIL_FROM is required in production');

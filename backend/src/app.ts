@@ -22,6 +22,7 @@ import { registerFeedRoutes } from './routes/feed';
 import { registerBillingRoutes } from './routes/billing';
 import { registerWebhookRoutes } from './routes/webhooks';
 import { registerDevCheckoutRoutes } from './routes/dev-checkout';
+import { registerInternalRoutes } from './routes/internal';
 
 export interface Metrics {
   startedAt: number;
@@ -178,6 +179,7 @@ export async function buildApp(options: BuildOptions): Promise<FastifyInstance> 
   registerBillingRoutes(app, deps);
   registerWebhookRoutes(app, deps);
   registerDevCheckoutRoutes(app, deps);
+  registerInternalRoutes(app, deps);
 
   return app;
 }
