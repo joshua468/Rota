@@ -10,7 +10,7 @@ const TABS = [
   { name: 'index', label: 'Home', icon: 'home' },
   { name: 'swap/index', label: 'Swaps', icon: 'repeat' },
   { name: 'activity', label: 'Activity', icon: 'activity' },
-  { name: 'settings/index', label: 'Settings', icon: 'settings' },
+  { name: 'settings', label: 'Settings', icon: 'settings' },
 ] as const;
 
 export const TAB_BAR_HEIGHT = 64;

@@ -38,14 +38,10 @@ export default function AppLayout() {
       <Tabs.Screen name="index" options={{ title: 'Home' }} />
       <Tabs.Screen name="swap/index" options={{ title: 'Swaps' }} />
       <Tabs.Screen name="activity" options={{ title: 'Activity' }} />
-      <Tabs.Screen name="settings/index" options={{ title: 'Settings' }} />
+      <Tabs.Screen name="settings" options={{ title: 'Settings' }} />
       <Tabs.Screen name="swap/[id]" options={{ href: null }} />
       <Tabs.Screen name="shift/[id]" options={{ href: null }} />
       <Tabs.Screen name="shift/new" options={{ href: null }} />
-      <Tabs.Screen name="settings/appearance" options={{ href: null }} />
-      <Tabs.Screen name="settings/billing" options={{ href: null }} />
-      <Tabs.Screen name="settings/notifications" options={{ href: null }} />
-      <Tabs.Screen name="settings/team" options={{ href: null }} />
     </Tabs>
   );
 }

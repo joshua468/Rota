@@ -30,6 +30,10 @@ const EXCLUDE = [
   /[\\/]theme[\\/]tokens\.ts$/,
   /[\\/]components[\\/]home[\\/]/,
   /[\\/]app[\\/]\(app\)[\\/]index\.tsx$/,
+  // The offline cache persists allow-listed, non-sensitive query data only.
+  // Tokens and secrets still live in expo-secure-store (Rule 03); this file
+  // never reads or writes them.
+  /[\\/]offline[\\/]persister\.ts$/,
 ];
 
 const SPACE_SCALE = new Set([0, 4, 8, 12, 16, 20, 24, 32, 40]);
