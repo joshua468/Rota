@@ -58,6 +58,10 @@ describe('dev hosted-checkout page', () => {
     expect(page.headers['content-type']).toContain('text/html');
     expect(page.body).toContain(url.searchParams.get('tx_ref'));
     expect(page.body).toContain('var callback = "rota://billing";');
+    // A web checkout runs in a second tab; the page announces success on a
+    // same-origin channel so the open app can refetch without reloading.
+    expect(page.body).toContain("new BroadcastChannel('rota-checkout')");
+    expect(page.body).toContain('rota-checkout-complete');
 
     const done = await ctx.app.inject({
       method: 'POST',
@@ -67,8 +71,8 @@ describe('dev hosted-checkout page', () => {
     });
     expect(done.statusCode).toBe(200);
     expect(done.json()).toMatchObject({ ok: true });
-
-    await ctx.queue.drain(10_000);
+    // The page tells the app as soon as this response resolves, so the route
+    // waits for the webhook job before answering.
     expect(await subscription(teamId)).toMatchObject({ plan_key: 'starter', seats: 5, status: 'active' });
   });
 

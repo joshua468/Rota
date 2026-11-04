@@ -78599,7 +78599,10 @@ function registerDevCheckoutRoutes(app, deps) {
       eventKey,
       payload
     });
-    if (stored) await deps.queue.add(WEBHOOK_QUEUE, { eventId: stored.id }, { attempts: 5 });
+    if (stored) {
+      await deps.queue.add(WEBHOOK_QUEUE, { eventId: stored.id }, { attempts: 5 });
+      await deps.queue.drain(8e3);
+    }
     return { ok: true, reference: body2.tx_ref };
   });
 }
@@ -78657,6 +78660,19 @@ function authorizePage(txRef, amount, callback) {
     var callback = ${callbackJson};
     var btn = document.getElementById('pay');
     var msg = document.getElementById('msg');
+    function tellRota() {
+      var message = { type: 'rota-checkout-complete', reference: txRef };
+      try {
+        if (typeof BroadcastChannel !== 'undefined') {
+          var channel = new BroadcastChannel('rota-checkout');
+          channel.postMessage(message);
+          channel.close();
+        }
+      } catch (e) {}
+      try {
+        if (window.opener) window.opener.postMessage(message, location.origin);
+      } catch (e) {}
+    }
     btn.addEventListener('click', function () {
       btn.disabled = true;
       msg.textContent = 'Completing\u2026';
@@ -78668,11 +78684,16 @@ function authorizePage(txRef, amount, callback) {
         .then(function (res) {
           if (!res.ok) throw new Error('HTTP ' + res.status);
           btn.textContent = 'Paid';
+          tellRota();
           if (callback) {
             msg.textContent = 'Payment complete. Returning to the Rota app\u2026';
             window.location.href = callback;
           } else {
-            msg.textContent = 'Payment complete. You can return to the Rota app.';
+            msg.textContent = 'Payment complete. Returning to Rota\u2026';
+            setTimeout(function () { window.close(); }, 400);
+            setTimeout(function () {
+              if (!window.closed) msg.textContent = 'Payment complete. You can close this tab.';
+            }, 1000);
           }
         })
         .catch(function (err) {

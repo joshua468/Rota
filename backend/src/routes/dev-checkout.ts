@@ -89,7 +89,14 @@ export function registerDevCheckoutRoutes(app: FastifyInstance, deps: AppDeps): 
       eventKey,
       payload,
     });
-    if (stored) await deps.queue.add(WEBHOOK_QUEUE, { eventId: stored.id }, { attempts: 5 });
+    if (stored) {
+      await deps.queue.add(WEBHOOK_QUEUE, { eventId: stored.id }, { attempts: 5 });
+      // The page signals the app as soon as this responds, so let the webhook job
+      // settle the subscription first. In the serverless runtime this is the
+      // in-process driver; the container's BullMQ worker keeps draining itself
+      // (`drain()` is a no-op there).
+      await deps.queue.drain(8_000);
+    }
     return { ok: true, reference: body.tx_ref };
   });
 }
@@ -151,6 +158,19 @@ function authorizePage(txRef: string, amount: string | undefined, callback: stri
     var callback = ${callbackJson};
     var btn = document.getElementById('pay');
     var msg = document.getElementById('msg');
+    function tellRota() {
+      var message = { type: 'rota-checkout-complete', reference: txRef };
+      try {
+        if (typeof BroadcastChannel !== 'undefined') {
+          var channel = new BroadcastChannel('rota-checkout');
+          channel.postMessage(message);
+          channel.close();
+        }
+      } catch (e) {}
+      try {
+        if (window.opener) window.opener.postMessage(message, location.origin);
+      } catch (e) {}
+    }
     btn.addEventListener('click', function () {
       btn.disabled = true;
       msg.textContent = 'Completing…';
@@ -162,11 +182,16 @@ function authorizePage(txRef: string, amount: string | undefined, callback: stri
         .then(function (res) {
           if (!res.ok) throw new Error('HTTP ' + res.status);
           btn.textContent = 'Paid';
+          tellRota();
           if (callback) {
             msg.textContent = 'Payment complete. Returning to the Rota app…';
             window.location.href = callback;
           } else {
-            msg.textContent = 'Payment complete. You can return to the Rota app.';
+            msg.textContent = 'Payment complete. Returning to Rota…';
+            setTimeout(function () { window.close(); }, 400);
+            setTimeout(function () {
+              if (!window.closed) msg.textContent = 'Payment complete. You can close this tab.';
+            }, 1000);
           }
         })
         .catch(function (err) {

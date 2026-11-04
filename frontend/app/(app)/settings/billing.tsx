@@ -1,12 +1,15 @@
 import { Redirect, router } from 'expo-router';
-import { useEffect, useState, type ReactNode } from 'react';
-import { Linking, Text, View } from 'react-native';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { Linking, Platform, Text, View } from 'react-native';
+import { useQueryClient } from '@tanstack/react-query';
 import {
+  queryKeys,
   useCheckout,
   useLedgerInfinite,
   usePlans,
   useSettings,
   useSubscription,
+  useTeamId,
 } from '@/api/queries';
 import {
   Badge,
@@ -25,6 +28,7 @@ import {
 } from '@/components';
 import { errorMessage } from '@/components/ErrorState';
 import { t } from '@/i18n';
+import { CHECKOUT_CHANNEL, CHECKOUT_COMPLETE, checkoutLaunch } from '@/lib/checkout';
 import { appDeepLink } from '@/lib/deepLink';
 import { formatDate, formatMoney } from '@/lib/format';
 import { resolveProfileZone } from '@/lib/timezone';
@@ -95,6 +99,34 @@ export default function BillingSettingsScreen() {
   const subscription = useSubscription();
   const ledger = useLedgerInfinite({ enabled: owner });
   const checkout = useCheckout();
+  const teamId = useTeamId();
+  const queryClient = useQueryClient();
+
+  const refreshBilling = useCallback(() => {
+    if (!teamId) return;
+    void queryClient.invalidateQueries({ queryKey: queryKeys.subscription(teamId) });
+    void queryClient.invalidateQueries({ queryKey: queryKeys.ledger(teamId) });
+  }, [queryClient, teamId]);
+
+  // A web checkout runs in a second tab. The hosted page announces success on
+  // the same origin so this tab can refetch without a full reload, which would
+  // drop the in-memory web session.
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined') return;
+    const onMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+      const data = event.data as { type?: unknown } | null;
+      if (data?.type === CHECKOUT_COMPLETE) refreshBilling();
+    };
+    window.addEventListener('message', onMessage);
+    const channel =
+      typeof BroadcastChannel === 'undefined' ? null : new BroadcastChannel(CHECKOUT_CHANNEL);
+    if (channel) channel.onmessage = onMessage;
+    return () => {
+      window.removeEventListener('message', onMessage);
+      channel?.close();
+    };
+  }, [refreshBilling]);
 
   const [seatsByPlan, setSeatsByPlan] = useState<Record<string, number>>({});
 
@@ -140,12 +172,19 @@ export default function BillingSettingsScreen() {
     setSeatsByPlan((prev) => ({ ...prev, [plan.key]: next }));
 
   const startCheckout = (planKey: PlanKey, seatCount: number) => {
+    const launch = checkoutLaunch(Platform.OS, appDeepLink('billing'));
+    // Open the tab inside the click so popup blockers allow it; point it at the
+    // hosted checkout only once the server returns the URL.
+    const popup =
+      launch.usePopup && typeof window !== 'undefined' ? window.open('', '_blank') : null;
     checkout.mutate(
-      { planKey, seats: seatCount, callbackUrl: appDeepLink('billing') },
+      { planKey, seats: seatCount, callbackUrl: launch.callbackUrl },
       {
         onSuccess: (url) => {
-          void Linking.openURL(url);
+          if (popup) popup.location.href = url;
+          else void Linking.openURL(url);
         },
+        onError: () => popup?.close(),
       },
     );
   };
